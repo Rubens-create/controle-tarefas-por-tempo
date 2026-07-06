@@ -354,7 +354,7 @@ fun ProductivityChart(
                         Column(
                             modifier = Modifier.weight(1f),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Bottom
+                            verticalArrangement = Arrangement.Bottom
                         ) {
                             Text(
                                 text = "%.1fh".format(hours),
