@@ -24,9 +24,8 @@ fun TaskListScreen(
     viewModel: TaskViewModel,
     onTaskClick: (Long) -> Unit
 ) {
-    val tasks by viewModel.allTasksWithChecklist.collectAsStateWithLifecycle()
+    val tasksWithTime by viewModel.tasksWithTodayTime.collectAsStateWithLifecycle()
     val activeTaskId by viewModel.activeTaskId.collectAsStateWithLifecycle()
-    val activeElapsedTime by viewModel.activeElapsedTime.collectAsStateWithLifecycle()
     val customTags by viewModel.customTags.collectAsStateWithLifecycle()
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -55,7 +54,7 @@ fun TaskListScreen(
             }
         }
     ) { paddingValues ->
-        if (tasks.isEmpty()) {
+        if (tasksWithTime.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -78,15 +77,12 @@ fun TaskListScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(
-                    items = tasks,
-                    key = { it.task.id }
-                ) { taskWithChecklist ->
+                    items = tasksWithTime,
+                    key = { it.taskWithChecklist.task.id }
+                ) { item ->
+                    val taskWithChecklist = item.taskWithChecklist
                     val isActive = taskWithChecklist.task.id == activeTaskId
-                    val displayTime = if (isActive) {
-                        viewModel.formatTime(activeElapsedTime)
-                    } else {
-                        viewModel.formatTime(taskWithChecklist.task.elapsedTimeMillis)
-                    }
+                    val displayTime = viewModel.formatTime(item.todayTimeMillis)
 
                     SwipeToDismissBox(
                         state = rememberSwipeToDismissBoxState(

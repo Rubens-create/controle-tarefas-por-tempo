@@ -8,6 +8,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccessTime
 import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.outlined.Label
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -15,8 +16,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.rubens.controletarefas.data.DailyTotal
 import com.rubens.controletarefas.viewmodel.TaskViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -24,24 +27,29 @@ import com.rubens.controletarefas.viewmodel.TaskViewModel
 fun DashboardScreen(
     viewModel: TaskViewModel
 ) {
-    val tasks by viewModel.allTasksWithChecklist.collectAsStateWithLifecycle()
+    val tasksWithTime by viewModel.tasksWithTodayTime.collectAsStateWithLifecycle()
+    val dailyTotals by viewModel.dailyTotals.collectAsStateWithLifecycle()
 
-    val totalTimeMs = tasks.sumOf { it.task.elapsedTimeMillis }
-    val totalTasks = tasks.size
-    val totalChecklist = tasks.sumOf { it.checklistItems.size }
-    val completedChecklist = tasks.sumOf { twc -> twc.checklistItems.count { it.isCompleted } }
+    // Métricas diárias (Tempo de hoje)
+    val totalTimeTodayMs = tasksWithTime.sumOf { it.todayTimeMillis }
+    val totalTasksToday = tasksWithTime.count { it.todayTimeMillis > 0 }
+    val totalChecklist = tasksWithTime.sumOf { it.taskWithChecklist.checklistItems.size }
+    val completedChecklist = tasksWithTime.sumOf { it.taskWithChecklist.checklistItems.count { it.isCompleted } }
 
-    // Group time by tag
-    val timeByTag = tasks
-        .filter { it.task.tag.isNotBlank() }
-        .groupBy { it.task.tag }
-        .mapValues { entry -> entry.value.sumOf { it.task.elapsedTimeMillis } }
+    // Agrupamento do tempo por tag (apenas HOJE)
+    val timeByTagToday = tasksWithTime
+        .filter { it.taskWithChecklist.task.tag.isNotBlank() }
+        .groupBy { it.taskWithChecklist.task.tag }
+        .mapValues { entry -> entry.value.sumOf { it.todayTimeMillis } }
         .toList()
         .sortedByDescending { it.second }
 
-    val untaggedTime = tasks
-        .filter { it.task.tag.isBlank() }
-        .sumOf { it.task.elapsedTimeMillis }
+    val untaggedTimeToday = tasksWithTime
+        .filter { it.taskWithChecklist.task.tag.isBlank() }
+        .sumOf { it.todayTimeMillis }
+
+    // Tag mais produtiva de hoje
+    val mostProductiveTag = timeByTagToday.firstOrNull()?.first ?: if (untaggedTimeToday > 0) "Sem tag" else "Nenhuma"
 
     Scaffold(
         topBar = {
@@ -66,33 +74,81 @@ fun DashboardScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Summary cards
+            // Seção de Destaque Diário
+            Text(
+                text = "Hoje",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+
+            // Cards de Sumário Diário
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 SummaryCard(
                     icon = Icons.Outlined.AccessTime,
-                    label = "Tempo Total",
-                    value = viewModel.formatTime(totalTimeMs),
+                    label = "Tempo Hoje",
+                    value = viewModel.formatTime(totalTimeTodayMs),
                     modifier = Modifier.weight(1f)
                 )
                 SummaryCard(
                     icon = Icons.Outlined.TaskAlt,
-                    label = "Tarefas",
-                    value = totalTasks.toString(),
+                    label = "Tarefas Ativas",
+                    value = totalTasksToday.toString(),
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            // Checklist progress
-            if (totalChecklist > 0) {
+            // Card da tag destaque
+            if (timeByTagToday.isNotEmpty() || untaggedTimeToday > 0) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant
                     )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Label,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Column {
+                            Text(
+                                text = "Tag Destaque de Hoje",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = mostProductiveTag,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Gráfico de Produtividade Semanal (Histórico de 7 dias)
+            ProductivityChart(dailyTotals = dailyTotals)
+
+            // Progresso do Checklist
+            if (totalChecklist > 0) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    border = CardDefaults.outlinedCardBorder()
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp)
@@ -109,7 +165,7 @@ fun DashboardScreen(
                                 .height(8.dp)
                                 .clip(RoundedCornerShape(4.dp)),
                             color = MaterialTheme.colorScheme.primary,
-                            trackColor = MaterialTheme.colorScheme.outline
+                            trackColor = MaterialTheme.colorScheme.outlineVariant
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
@@ -121,25 +177,26 @@ fun DashboardScreen(
                 }
             }
 
-            // Time by tag
+            // Tempo por Tag (HOJE)
             Text(
-                text = "Tempo por Tag",
-                style = MaterialTheme.typography.titleLarge
+                text = "Tempo por Tag (Hoje)",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
             )
 
-            if (timeByTag.isEmpty() && untaggedTime == 0L) {
+            if (timeByTagToday.isEmpty() && untaggedTimeToday == 0L) {
                 Text(
-                    text = "Nenhum dado de tempo registrado ainda.",
+                    text = "Nenhum dado registrado para o dia de hoje.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 val maxTime = maxOf(
-                    timeByTag.maxOfOrNull { it.second } ?: 0L,
-                    untaggedTime
+                    timeByTagToday.maxOfOrNull { it.second } ?: 0L,
+                    untaggedTimeToday
                 ).coerceAtLeast(1L)
 
-                timeByTag.forEach { (tag, timeMs) ->
+                timeByTagToday.forEach { (tag, timeMs) ->
                     TagTimeBar(
                         tag = tag,
                         timeMs = timeMs,
@@ -148,10 +205,10 @@ fun DashboardScreen(
                     )
                 }
 
-                if (untaggedTime > 0L) {
+                if (untaggedTimeToday > 0L) {
                     TagTimeBar(
                         tag = "Sem tag",
-                        timeMs = untaggedTime,
+                        timeMs = untaggedTimeToday,
                         maxTimeMs = maxTime,
                         formatTime = { viewModel.formatTime(it) }
                     )
@@ -186,7 +243,8 @@ private fun SummaryCard(
             )
             Text(
                 text = value,
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold
             )
             Text(
                 text = label,
@@ -239,6 +297,95 @@ private fun TagTimeBar(
                     .clip(RoundedCornerShape(6.dp))
                     .background(tagColor)
             )
+        }
+    }
+}
+
+@Composable
+fun ProductivityChart(
+    dailyTotals: List<DailyTotal>,
+    modifier: Modifier = Modifier
+) {
+    val sortedTotals = dailyTotals.sortedBy { it.dateString }.takeLast(7)
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        border = CardDefaults.outlinedCardBorder(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = "Produtividade Semanal (Horas)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+
+            if (sortedTotals.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .height(150.dp)
+                        .fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "Nenhum historico de tempo nesta semana.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            } else {
+                val maxDuration = sortedTotals.maxOfOrNull { it.totalDuration }?.coerceAtLeast(1L) ?: 1L
+                val maxHours = maxDuration.toFloat() / 3600000f
+
+                Row(
+                    modifier = Modifier
+                        .height(150.dp)
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.Bottom
+                ) {
+                    sortedTotals.forEach { total ->
+                        val hours = total.totalDuration.toFloat() / 3600000f
+                        val heightFraction = if (maxHours > 0) hours / maxHours else 0f
+
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Bottom
+                        ) {
+                            Text(
+                                text = "%.1fh".format(hours),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight(fraction = heightFraction.coerceIn(0.08f, 1f))
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 4.dp))
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            val formattedLabel = try {
+                                val parts = total.dateString.split("-")
+                                "${parts[2]}/${parts[1]}"
+                            } catch (e: Exception) {
+                                total.dateString
+                            }
+                            Text(
+                                text = formattedLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }

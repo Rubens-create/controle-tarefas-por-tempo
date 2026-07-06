@@ -10,11 +10,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     private val database = AppDatabase.getInstance(application)
-    private val repository = TaskRepository(database.taskDao(), database.checklistItemDao())
+    private val repository = TaskRepository(
+        database.taskDao(),
+        database.checklistItemDao(),
+        database.timeLogDao()
+    )
 
     val allTasksWithChecklist: StateFlow<List<TaskWithChecklist>> =
         repository.allTasksWithChecklist
@@ -34,21 +41,64 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     private var timerStartRealtime: Long = 0L
     private var timerBaseElapsed: Long = 0L
 
+    // Controle de data de hoje
+    val todayDate = MutableStateFlow(getTodayDateString())
+
+    // Logs de tempo de hoje
+    val todayTimeLogs: StateFlow<List<TimeLog>> = todayDate
+        .flatMapLatest { date -> repository.getTimeLogsForDate(date) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Combina as tarefas com o tempo decorrido especificamente HOJE
+    val tasksWithTodayTime: StateFlow<List<TaskWithTodayTime>> = combine(
+        allTasksWithChecklist,
+        todayTimeLogs,
+        _activeTaskId,
+        _activeElapsedTime
+    ) { tasks, logs, activeId, activeTime ->
+        tasks.map { twc ->
+            val logForTask = logs.find { it.taskId == twc.task.id }
+            val baseTime = logForTask?.durationMillis ?: 0L
+            val finalTime = if (twc.task.id == activeId) {
+                activeTime
+            } else {
+                baseTime
+            }
+            TaskWithTodayTime(twc, finalTime)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Totais diários de produtividade para o gráfico (últimos 7 dias)
+    val dailyTotals: StateFlow<List<DailyTotal>> = repository.getDailyTotalsForLast7Days()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Lista de Tags Padrão ampliada e customizadas gerenciadas nas configurações
     private val _customTags = MutableStateFlow(
-        listOf("Trabalho", "Estudo", "Games", "Lazer", "Almoco", "Descanso", "Redes Sociais")
+        listOf(
+            "Trabalho", "Estudo", "Games", "Lazer", "Almoco",
+            "Descanso", "Redes Sociais", "Exercicio", "Projetos",
+            "Leitura", "Reuniao"
+        )
     )
     val customTags: StateFlow<List<String>> = _customTags.asStateFlow()
 
     init {
-        // Restore active task on app start
+        // Restaurar tarefa ativa na inicialização do app
         viewModelScope.launch {
             val activeTask = repository.getActiveTask()
             if (activeTask != null) {
+                // Checar se temos um log para hoje
+                val todayLog = repository.getTimeLogsForDate(getTodayDateString()).first().find { it.taskId == activeTask.id }
                 _activeTaskId.value = activeTask.id
-                timerBaseElapsed = activeTask.elapsedTimeMillis
+                timerBaseElapsed = todayLog?.durationMillis ?: 0L
                 startTimerInternal()
             }
         }
+    }
+
+    fun getTodayDateString(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        return sdf.format(Date())
     }
 
     fun addTask(title: String, description: String = "", tag: String = "") {
@@ -76,24 +126,29 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleTask(taskId: Long) {
         viewModelScope.launch {
+            // Atualizar data de hoje caso tenha mudado o dia enquanto o app rodava
+            todayDate.value = getTodayDateString()
+
             if (_activeTaskId.value == taskId) {
-                // Deactivate current task
+                // Pausar tarefa ativa
                 stopTimer()
                 repository.deactivateAllTasks()
                 _activeTaskId.value = null
             } else {
-                // Save current task's elapsed time
+                // Salvar tempo acumulado da tarefa ativa anterior antes de trocar
                 val currentActiveId = _activeTaskId.value
                 if (currentActiveId != null) {
-                    val elapsed = _activeElapsedTime.value
-                    repository.updateElapsedTime(currentActiveId, elapsed)
+                    flushSessionTime(currentActiveId, _activeElapsedTime.value)
                     stopTimer()
                 }
-                // Activate new task
+                
+                // Ativar nova tarefa
                 repository.activateTask(taskId)
-                val task = repository.getTaskById(taskId)
+                val todayLogs = repository.getTimeLogsForDate(getTodayDateString()).first()
+                val logForTask = todayLogs.find { it.taskId == taskId }
+                
                 _activeTaskId.value = taskId
-                timerBaseElapsed = task?.elapsedTimeMillis ?: 0L
+                timerBaseElapsed = logForTask?.durationMillis ?: 0L
                 startTimerInternal()
             }
         }
@@ -102,10 +157,23 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     private fun startTimerInternal() {
         timerJob?.cancel()
         timerStartRealtime = SystemClock.elapsedRealtime()
+        var lastFlushRealtime = timerStartRealtime
+        
         timerJob = viewModelScope.launch {
             while (isActive) {
                 val now = SystemClock.elapsedRealtime()
-                _activeElapsedTime.value = timerBaseElapsed + (now - timerStartRealtime)
+                val elapsedThisSession = now - timerStartRealtime
+                val totalElapsed = timerBaseElapsed + elapsedThisSession
+                _activeElapsedTime.value = totalElapsed
+                
+                // Salvar/flush periodicamente no banco a cada 5 segundos para segurança contra quedas do app
+                if (now - lastFlushRealtime >= 5000) {
+                    val activeId = _activeTaskId.value
+                    if (activeId != null) {
+                        flushSessionTime(activeId, totalElapsed)
+                    }
+                    lastFlushRealtime = now
+                }
                 delay(50L)
             }
         }
@@ -116,15 +184,34 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         timerJob = null
         val currentActiveId = _activeTaskId.value
         if (currentActiveId != null) {
-            val elapsed = _activeElapsedTime.value
+            val totalElapsed = _activeElapsedTime.value
             viewModelScope.launch {
-                repository.updateElapsedTime(currentActiveId, elapsed)
+                flushSessionTime(currentActiveId, totalElapsed)
             }
         }
         _activeElapsedTime.value = 0L
     }
 
-    // Checklist operations
+    // Grava o tempo acumulado no TimeLog do dia corrente
+    private suspend fun flushSessionTime(taskId: Long, totalTime: Long) {
+        val today = getTodayDateString()
+        // O tempo do log de hoje deve ser atualizado para ser exatamente o totalTime atualizado da tarefa
+        val todayLogs = repository.getTimeLogsForDate(today).first()
+        val existingLog = todayLogs.find { it.taskId == taskId }
+        
+        if (existingLog != null) {
+            // Atualiza para o novo tempo total
+            repository.updateTask(Task(id = taskId, title = "", isActive = true).copy(id = taskId, elapsedTimeMillis = totalTime)) // mantém sincronizado se necessário
+            database.timeLogDao().insertOrUpdate(existingLog.copy(durationMillis = totalTime))
+        } else {
+            // Cria um novo log com o tempo acumulado
+            database.timeLogDao().insertOrUpdate(
+                TimeLog(taskId = taskId, dateString = today, durationMillis = totalTime)
+            )
+        }
+    }
+
+    // Checklist
     fun getChecklistItems(taskId: Long): Flow<List<ChecklistItem>> =
         repository.getChecklistItemsForTask(taskId)
 
@@ -152,7 +239,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         emit(repository.getTaskWithChecklistById(taskId))
     }
 
-    // Tag management
+    // Tags
     fun addCustomTag(tag: String) {
         val current = _customTags.value.toMutableList()
         if (tag.isNotBlank() && !current.contains(tag)) {
@@ -169,7 +256,7 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             stopTimer()
             _activeTaskId.value = null
-            // Delete all tasks (cascade deletes checklist items)
+            repository.deleteAllTimeLogs()
             allTasksWithChecklist.value.forEach { twc ->
                 repository.deleteTask(twc.task)
             }
@@ -186,13 +273,6 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
-        // Save elapsed time when ViewModel is cleared
-        val currentActiveId = _activeTaskId.value
-        if (currentActiveId != null && timerJob?.isActive == true) {
-            val elapsed = _activeElapsedTime.value
-            // We can't use viewModelScope here as it's cancelled
-            // The time will be saved next time the app starts
-        }
         timerJob?.cancel()
     }
 }

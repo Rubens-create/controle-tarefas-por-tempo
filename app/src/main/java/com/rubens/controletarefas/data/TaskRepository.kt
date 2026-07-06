@@ -4,7 +4,8 @@ import kotlinx.coroutines.flow.Flow
 
 class TaskRepository(
     private val taskDao: TaskDao,
-    private val checklistItemDao: ChecklistItemDao
+    private val checklistItemDao: ChecklistItemDao,
+    private val timeLogDao: TimeLogDao
 ) {
     val allTasksWithChecklist: Flow<List<TaskWithChecklist>> = taskDao.getAllTasksWithChecklist()
     val allTasks: Flow<List<Task>> = taskDao.getAllTasks()
@@ -48,4 +49,24 @@ class TaskRepository(
 
     suspend fun deleteAllChecklistItemsForTask(taskId: Long) =
         checklistItemDao.deleteAllChecklistItemsForTask(taskId)
+
+    // Métodos do TimeLog
+    fun getTimeLogsForDate(date: String): Flow<List<TimeLog>> = timeLogDao.getTimeLogsForDate(date)
+
+    fun getDailyTotalsForLast7Days(): Flow<List<DailyTotal>> = timeLogDao.getDailyTotalsForLast7Days()
+
+    fun getAllTimeLogs(): Flow<List<TimeLog>> = timeLogDao.getAllTimeLogs()
+
+    suspend fun addOrUpdateTimeLog(taskId: Long, dateString: String, durationMillis: Long) {
+        val existing = timeLogDao.getTimeLog(taskId, dateString)
+        if (existing != null) {
+            timeLogDao.insertOrUpdate(existing.copy(durationMillis = existing.durationMillis + durationMillis))
+        } else {
+            timeLogDao.insertOrUpdate(
+                TimeLog(taskId = taskId, dateString = dateString, durationMillis = durationMillis)
+            )
+        }
+    }
+
+    suspend fun deleteAllTimeLogs() = timeLogDao.deleteAllTimeLogs()
 }

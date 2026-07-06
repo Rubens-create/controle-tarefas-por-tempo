@@ -26,13 +26,13 @@ fun TaskDetailScreen(
     viewModel: TaskViewModel,
     onBack: () -> Unit
 ) {
-    val tasksWithChecklist by viewModel.allTasksWithChecklist.collectAsStateWithLifecycle()
+    val tasksWithTime by viewModel.tasksWithTodayTime.collectAsStateWithLifecycle()
     val activeTaskId by viewModel.activeTaskId.collectAsStateWithLifecycle()
-    val activeElapsedTime by viewModel.activeElapsedTime.collectAsStateWithLifecycle()
     val customTags by viewModel.customTags.collectAsStateWithLifecycle()
     val checklistItems by viewModel.getChecklistItems(taskId).collectAsStateWithLifecycle(initialValue = emptyList())
 
-    val taskWithChecklist = tasksWithChecklist.find { it.task.id == taskId }
+    val item = tasksWithTime.find { it.taskWithChecklist.task.id == taskId }
+    val taskWithChecklist = item?.taskWithChecklist
     val task = taskWithChecklist?.task
 
     if (task == null) {
@@ -46,7 +46,7 @@ fun TaskDetailScreen(
     }
 
     val isActive = task.id == activeTaskId
-    val displayTime = if (isActive) activeElapsedTime else task.elapsedTimeMillis
+    val displayTime = item?.todayTimeMillis ?: 0L
 
     var editTitle by remember(task.id) { mutableStateOf(task.title) }
     var editDescription by remember(task.id) { mutableStateOf(task.description) }

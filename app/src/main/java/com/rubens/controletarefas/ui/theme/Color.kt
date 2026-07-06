@@ -20,10 +20,14 @@ fun getTagColors(tag: String): TagColors {
         "trabalho" -> TagColors(Color(0xFFE3F2FD), Color(0xFF0D47A1))
         "estudo" -> TagColors(Color(0xFFE8F5E9), Color(0xFF1B5E20))
         "games" -> TagColors(Color(0xFFF3E5F5), Color(0xFF4A148C))
-        "lazer" -> TagColors(Color(0xFFFFF3E0), Color(0xFFE65100))
+        "lazer" -> TagColors(Color(0xFFFFFDE7), Color(0xFFF57F17))
         "almoco", "almoço" -> TagColors(Color(0xFFFFEBEE), Color(0xFFB71C1C))
         "descanso" -> TagColors(Color(0xFFE0F2F1), Color(0xFF004D40))
         "redes sociais" -> TagColors(Color(0xFFFCE4EC), Color(0xFF880E4F))
+        "exercicio", "exercício" -> TagColors(Color(0xFFE8EAF6), Color(0xFF3F51B5))
+        "projetos" -> TagColors(Color(0xFFE0F7FA), Color(0xFF00838F))
+        "leitura" -> TagColors(Color(0xFFF1F8E9), Color(0xFF558B2F))
+        "reuniao", "reunião" -> TagColors(Color(0xFFFFE0B2), Color(0xFFE65100))
         else -> {
             val hash = tag.hashCode().let { if (it < 0) -it else it }
             val presets = listOf(
