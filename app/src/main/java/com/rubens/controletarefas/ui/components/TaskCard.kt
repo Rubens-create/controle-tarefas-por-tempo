@@ -86,21 +86,28 @@ fun TaskCard(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (tag.isNotBlank()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        val tagColors = com.rubens.controletarefas.ui.theme.getTagColors(tag)
+                        Surface(
+                            color = tagColors.container,
+                            contentColor = tagColors.content,
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.padding(vertical = 2.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Outlined.Label,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(
-                                text = tag,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Label,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(10.dp)
+                                )
+                                Text(
+                                    text = tag,
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
                         }
                     }
                     if (checklistTotal > 0) {

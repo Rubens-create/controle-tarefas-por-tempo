@@ -27,6 +27,7 @@ fun TagSelector(
     ) {
         items(tags) { tag ->
             val isSelected = tag == selectedTag
+            val tagColors = com.rubens.controletarefas.ui.theme.getTagColors(tag)
             FilterChip(
                 selected = isSelected,
                 onClick = { onTagSelected(if (isSelected) "" else tag) },
@@ -40,13 +41,16 @@ fun TagSelector(
                 },
                 shape = RoundedCornerShape(20.dp),
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = MaterialTheme.colorScheme.primary,
-                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
-                    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary
+                    selectedContainerColor = tagColors.container,
+                    selectedLabelColor = tagColors.content,
+                    selectedLeadingIconColor = tagColors.content,
+                    containerColor = MaterialTheme.colorScheme.surface,
+                    labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     borderColor = MaterialTheme.colorScheme.outline,
-                    selectedBorderColor = MaterialTheme.colorScheme.primary,
+                    selectedBorderColor = tagColors.content,
                     enabled = true,
                     selected = isSelected
                 )

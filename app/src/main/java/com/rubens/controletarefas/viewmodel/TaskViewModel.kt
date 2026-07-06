@@ -34,9 +34,8 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
     private var timerStartRealtime: Long = 0L
     private var timerBaseElapsed: Long = 0L
 
-    // Custom tags managed in settings
     private val _customTags = MutableStateFlow(
-        listOf("Trabalho", "Estudo", "Games", "Lazer", "Almoco")
+        listOf("Trabalho", "Estudo", "Games", "Lazer", "Almoco", "Descanso", "Redes Sociais")
     )
     val customTags: StateFlow<List<String>> = _customTags.asStateFlow()
 

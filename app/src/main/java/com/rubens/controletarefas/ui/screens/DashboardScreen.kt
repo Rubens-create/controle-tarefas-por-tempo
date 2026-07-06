@@ -231,12 +231,13 @@ private fun TagTimeBar(
                 .clip(RoundedCornerShape(6.dp))
                 .background(MaterialTheme.colorScheme.outlineVariant)
         ) {
+            val tagColor = com.rubens.controletarefas.ui.theme.getTagColors(tag).content
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .fillMaxWidth(fraction = (timeMs.toFloat() / maxTimeMs.toFloat()).coerceIn(0f, 1f))
                     .clip(RoundedCornerShape(6.dp))
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(tagColor)
             )
         }
     }
