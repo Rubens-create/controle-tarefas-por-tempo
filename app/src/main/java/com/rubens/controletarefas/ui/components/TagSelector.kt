@@ -46,7 +46,7 @@ fun TagSelector(
                     selectedLeadingIconColor = tagColors.content,
                     containerColor = MaterialTheme.colorScheme.surface,
                     labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    leadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    iconColor = MaterialTheme.colorScheme.onSurfaceVariant
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     borderColor = MaterialTheme.colorScheme.outline,
