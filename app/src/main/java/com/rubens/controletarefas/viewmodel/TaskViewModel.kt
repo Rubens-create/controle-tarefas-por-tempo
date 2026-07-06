@@ -201,7 +201,6 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         
         if (existingLog != null) {
             // Atualiza para o novo tempo total
-            repository.updateTask(Task(id = taskId, title = "", isActive = true).copy(id = taskId, elapsedTimeMillis = totalTime)) // mantém sincronizado se necessário
             database.timeLogDao().insertOrUpdate(existingLog.copy(durationMillis = totalTime))
         } else {
             // Cria um novo log com o tempo acumulado
