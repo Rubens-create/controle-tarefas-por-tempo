@@ -2,9 +2,11 @@ package com.rubens.controletarefas.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 
@@ -12,11 +14,12 @@ import androidx.compose.ui.window.Dialog
 fun AddTaskDialog(
     tags: List<String>,
     onDismiss: () -> Unit,
-    onConfirm: (title: String, description: String, tag: String) -> Unit
+    onConfirm: (title: String, description: String, tag: String, dailyGoalMinutes: Int) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedTag by remember { mutableStateOf("") }
+    var dailyGoalHours by remember { mutableStateOf("") }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -61,6 +64,20 @@ fun AddTaskDialog(
                     )
                 )
 
+                OutlinedTextField(
+                    value = dailyGoalHours,
+                    onValueChange = { dailyGoalHours = it },
+                    label = { Text("Meta diaria (horas, ex: 1.5 ou 2)") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+
                 if (tags.isNotEmpty()) {
                     Text(
                         text = "Tag",
@@ -84,7 +101,8 @@ fun AddTaskDialog(
                     Button(
                         onClick = {
                             if (title.isNotBlank()) {
-                                onConfirm(title.trim(), description.trim(), selectedTag)
+                                val minutes = dailyGoalHours.replace(',', '.').toFloatOrNull()?.let { (it * 60).toInt() } ?: 0
+                                onConfirm(title.trim(), description.trim(), selectedTag, minutes)
                             }
                         },
                         enabled = title.isNotBlank(),

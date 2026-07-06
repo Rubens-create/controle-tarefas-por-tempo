@@ -101,10 +101,10 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         return sdf.format(Date())
     }
 
-    fun addTask(title: String, description: String = "", tag: String = "") {
+    fun addTask(title: String, description: String = "", tag: String = "", dailyGoalMinutes: Int = 0) {
         viewModelScope.launch {
             repository.insertTask(
-                Task(title = title, description = description, tag = tag)
+                Task(title = title, description = description, tag = tag, dailyGoalMinutes = dailyGoalMinutes)
             )
         }
     }

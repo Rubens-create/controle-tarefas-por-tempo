@@ -12,5 +12,6 @@ data class Task(
     val elapsedTimeMillis: Long = 0L,
     val isActive: Boolean = false,
     val tag: String = "",
+    val dailyGoalMinutes: Int = 0, // Meta diária em minutos (0 = sem meta)
     val createdAt: Long = System.currentTimeMillis()
 )

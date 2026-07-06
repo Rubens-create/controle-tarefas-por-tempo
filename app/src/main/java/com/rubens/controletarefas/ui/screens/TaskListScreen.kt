@@ -116,6 +116,8 @@ fun TaskListScreen(
                             tag = taskWithChecklist.task.tag,
                             checklistTotal = taskWithChecklist.checklistItems.size,
                             checklistCompleted = taskWithChecklist.checklistItems.count { it.isCompleted },
+                            dailyGoalMinutes = taskWithChecklist.task.dailyGoalMinutes,
+                            todayTimeMillis = item.todayTimeMillis,
                             onToggleTimer = { viewModel.toggleTask(taskWithChecklist.task.id) },
                             onClick = { onTaskClick(taskWithChecklist.task.id) }
                         )
@@ -129,8 +131,8 @@ fun TaskListScreen(
         AddTaskDialog(
             tags = customTags,
             onDismiss = { showAddDialog = false },
-            onConfirm = { title, description, tag ->
-                viewModel.addTask(title, description, tag)
+            onConfirm = { title, description, tag, dailyGoalMinutes ->
+                viewModel.addTask(title, description, tag, dailyGoalMinutes)
                 showAddDialog = false
             }
         )

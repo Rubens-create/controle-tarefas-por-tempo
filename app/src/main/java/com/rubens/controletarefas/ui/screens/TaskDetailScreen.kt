@@ -51,6 +51,8 @@ fun TaskDetailScreen(
     var editTitle by remember(task.id) { mutableStateOf(task.title) }
     var editDescription by remember(task.id) { mutableStateOf(task.description) }
     var editTag by remember(task.id) { mutableStateOf(task.tag) }
+    val initialGoalHours = if (task.dailyGoalMinutes > 0) (task.dailyGoalMinutes.toFloat() / 60f).toString() else ""
+    var editGoalHours by remember(task.id) { mutableStateOf(initialGoalHours) }
 
     Scaffold(
         topBar = {
@@ -59,11 +61,13 @@ fun TaskDetailScreen(
                 navigationIcon = {
                     IconButton(onClick = {
                         // Save changes before going back
+                        val minutes = editGoalHours.replace(',', '.').toFloatOrNull()?.let { (it * 60).toInt() } ?: 0
                         viewModel.updateTask(
                             task.copy(
                                 title = editTitle,
                                 description = editDescription,
-                                tag = editTag
+                                tag = editTag,
+                                dailyGoalMinutes = minutes
                             )
                         )
                         onBack()
@@ -147,6 +151,23 @@ fun TaskDetailScreen(
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 2,
                 maxLines = 5,
+                shape = RoundedCornerShape(8.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                )
+            )
+
+            // Meta Diária
+            OutlinedTextField(
+                value = editGoalHours,
+                onValueChange = { editGoalHours = it },
+                label = { Text("Meta diaria (em horas, ex: 1.5 ou 2)") },
+                singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                ),
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = MaterialTheme.colorScheme.primary,
