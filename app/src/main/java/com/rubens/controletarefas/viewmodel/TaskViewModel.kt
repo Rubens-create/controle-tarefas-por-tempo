@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -101,10 +102,25 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         return sdf.format(Date())
     }
 
-    fun addTask(title: String, description: String = "", tag: String = "", dailyGoalMinutes: Int = 0) {
+    fun addTask(
+        title: String,
+        description: String = "",
+        tag: String = "",
+        dailyGoalMinutes: Int = 0,
+        goalDaysOfWeek: String = "1,2,3,4,5,6,7",
+        goalMonths: Int = 0
+    ) {
         viewModelScope.launch {
             repository.insertTask(
-                Task(title = title, description = description, tag = tag, dailyGoalMinutes = dailyGoalMinutes)
+                Task(
+                    title = title,
+                    description = description,
+                    tag = tag,
+                    dailyGoalMinutes = dailyGoalMinutes,
+                    goalDaysOfWeek = goalDaysOfWeek,
+                    goalMonths = goalMonths,
+                    goalStartTimestamp = System.currentTimeMillis()
+                )
             )
         }
     }
@@ -268,6 +284,33 @@ class TaskViewModel(application: Application) : AndroidViewModel(application) {
         val minutes = (totalSeconds % 3600) / 60
         val seconds = totalSeconds % 60
         return "%02d:%02d:%02d".format(hours, minutes, seconds)
+    }
+
+    fun isGoalActiveToday(task: Task): Boolean {
+        if (task.dailyGoalMinutes <= 0) return false
+        
+        // Verifica dia da semana (1=Dom, 2=Seg, ..., 7=Sab)
+        val calendar = Calendar.getInstance()
+        val todayDayOfWeekNum = calendar.get(Calendar.DAY_OF_WEEK)
+        val activeDays = task.goalDaysOfWeek.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+        if (!activeDays.contains(todayDayOfWeekNum)) return false
+        
+        // Verifica limite de meses
+        if (task.goalMonths > 0 && task.goalStartTimestamp > 0) {
+            val startCalendar = Calendar.getInstance().apply {
+                timeInMillis = task.goalStartTimestamp
+            }
+            val endCalendar = Calendar.getInstance().apply {
+                timeInMillis = task.goalStartTimestamp
+                add(Calendar.MONTH, task.goalMonths)
+            }
+            val today = Calendar.getInstance()
+            if (today.before(startCalendar) || today.after(endCalendar)) {
+                return false
+            }
+        }
+        
+        return true
     }
 
     override fun onCleared() {

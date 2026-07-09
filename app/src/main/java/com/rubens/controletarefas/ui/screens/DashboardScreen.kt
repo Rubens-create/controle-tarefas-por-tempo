@@ -30,6 +30,11 @@ fun DashboardScreen(
     val tasksWithTime by viewModel.tasksWithTodayTime.collectAsStateWithLifecycle()
     val dailyTotals by viewModel.dailyTotals.collectAsStateWithLifecycle()
 
+    // Filtra tarefas que têm meta ativa hoje
+    val tasksWithGoalToday = tasksWithTime.filter { item ->
+        viewModel.isGoalActiveToday(item.taskWithChecklist.task)
+    }
+
     // Métricas diárias (Tempo de hoje)
     val totalTimeTodayMs = tasksWithTime.sumOf { it.todayTimeMillis }
     val totalTasksToday = tasksWithTime.count { it.todayTimeMillis > 0 }
@@ -132,6 +137,90 @@ fun DashboardScreen(
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold
                             )
+                        }
+                    }
+                }
+            }
+
+            if (tasksWithGoalToday.isNotEmpty()) {
+                val totalExpected = tasksWithGoalToday.sumOf { it.taskWithChecklist.task.dailyGoalMinutes * 60 * 1000L }
+                val totalActual = tasksWithGoalToday.sumOf { it.todayTimeMillis }
+                val netDiff = totalActual - totalExpected
+                val isAhead = netDiff >= 0
+                val absDiffText = viewModel.formatTime(if (netDiff < 0) -netDiff else netDiff)
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    ),
+                    border = CardDefaults.outlinedCardBorder()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "Desempenho das Metas de Hoje",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = if (isAhead) "Indo bem!" else "Indo mal...",
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isAhead) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                            )
+                            Text(
+                                text = if (isAhead) "+$absDiffText a mais" else "-$absDiffText a menos",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (isAhead) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                            )
+                        }
+                        
+                        Spacer(modifier = Modifier.height(12.dp))
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                        Spacer(modifier = Modifier.height(12.dp))
+                        
+                        tasksWithGoalToday.forEach { item ->
+                            val task = item.taskWithChecklist.task
+                            val goalMillis = task.dailyGoalMinutes * 60 * 1000L
+                            val actualMillis = item.todayTimeMillis
+                            val diff = actualMillis - goalMillis
+                            
+                            val diffSign = if (diff >= 0) "+" else "-"
+                            val absDiff = if (diff < 0) -diff else diff
+                            
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = task.title,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "Meta: ${task.dailyGoalMinutes / 60}h${if (task.dailyGoalMinutes % 60 > 0) "${task.dailyGoalMinutes % 60}m" else ""} | Feito: ${viewModel.formatTime(actualMillis)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                Text(
+                                    text = "$diffSign${viewModel.formatTime(absDiff)}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (diff >= 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                )
+                            }
                         }
                     }
                 }

@@ -109,18 +109,20 @@ fun TaskListScreen(
                         },
                         enableDismissFromStartToEnd = false
                     ) {
-                        TaskCard(
-                            title = taskWithChecklist.task.title,
-                            formattedTime = displayTime,
-                            isActive = isActive,
-                            tag = taskWithChecklist.task.tag,
-                            checklistTotal = taskWithChecklist.checklistItems.size,
-                            checklistCompleted = taskWithChecklist.checklistItems.count { it.isCompleted },
-                            dailyGoalMinutes = taskWithChecklist.task.dailyGoalMinutes,
-                            todayTimeMillis = item.todayTimeMillis,
-                            onToggleTimer = { viewModel.toggleTask(taskWithChecklist.task.id) },
-                            onClick = { onTaskClick(taskWithChecklist.task.id) }
-                        )
+                    val isGoalActive = viewModel.isGoalActiveToday(taskWithChecklist.task)
+                    val displayGoalMins = if (isGoalActive) taskWithChecklist.task.dailyGoalMinutes else 0
+                    TaskCard(
+                        title = taskWithChecklist.task.title,
+                        formattedTime = displayTime,
+                        isActive = isActive,
+                        tag = taskWithChecklist.task.tag,
+                        checklistTotal = taskWithChecklist.checklistItems.size,
+                        checklistCompleted = taskWithChecklist.checklistItems.count { it.isCompleted },
+                        dailyGoalMinutes = displayGoalMins,
+                        todayTimeMillis = item.todayTimeMillis,
+                        onToggleTimer = { viewModel.toggleTask(taskWithChecklist.task.id) },
+                        onClick = { onTaskClick(taskWithChecklist.task.id) }
+                    )
                     }
                 }
             }
@@ -131,8 +133,8 @@ fun TaskListScreen(
         AddTaskDialog(
             tags = customTags,
             onDismiss = { showAddDialog = false },
-            onConfirm = { title, description, tag, dailyGoalMinutes ->
-                viewModel.addTask(title, description, tag, dailyGoalMinutes)
+            onConfirm = { title, description, tag, dailyGoalMinutes, days, months ->
+                viewModel.addTask(title, description, tag, dailyGoalMinutes, days, months)
                 showAddDialog = false
             }
         )

@@ -17,6 +17,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rubens.controletarefas.ui.components.ChecklistSection
 import com.rubens.controletarefas.ui.components.TagSelector
 import com.rubens.controletarefas.ui.components.TimerDisplay
+import com.rubens.controletarefas.ui.components.DayOfWeekSelector
 import com.rubens.controletarefas.viewmodel.TaskViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,6 +54,11 @@ fun TaskDetailScreen(
     var editTag by remember(task.id) { mutableStateOf(task.tag) }
     val initialGoalHours = if (task.dailyGoalMinutes > 0) (task.dailyGoalMinutes.toFloat() / 60f).toString() else ""
     var editGoalHours by remember(task.id) { mutableStateOf(initialGoalHours) }
+    val initialDays = remember(task.id) {
+        task.goalDaysOfWeek.split(",").mapNotNull { it.toIntOrNull() }.toSet()
+    }
+    var editDays by remember(task.id) { mutableStateOf(initialDays) }
+    var editGoalMonthsText by remember(task.id) { mutableStateOf(if (task.goalMonths > 0) task.goalMonths.toString() else "") }
 
     Scaffold(
         topBar = {
@@ -62,12 +68,16 @@ fun TaskDetailScreen(
                     IconButton(onClick = {
                         // Save changes before going back
                         val minutes = editGoalHours.replace(',', '.').toFloatOrNull()?.let { (it * 60).toInt() } ?: 0
+                        val daysString = editDays.sorted().joinToString(",")
+                        val months = editGoalMonthsText.toIntOrNull() ?: 0
                         viewModel.updateTask(
                             task.copy(
                                 title = editTitle,
                                 description = editDescription,
                                 tag = editTag,
-                                dailyGoalMinutes = minutes
+                                dailyGoalMinutes = minutes,
+                                goalDaysOfWeek = daysString,
+                                goalMonths = months
                             )
                         )
                         onBack()
@@ -174,6 +184,38 @@ fun TaskDetailScreen(
                     unfocusedBorderColor = MaterialTheme.colorScheme.outline
                 )
             )
+
+            if (editGoalHours.isNotBlank() && editGoalHours.replace(',', '.').toFloatOrNull() ?: 0f > 0f) {
+                // Dias ativos da meta
+                Column {
+                    Text(
+                        text = "Dias ativos da meta",
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                    DayOfWeekSelector(
+                        selectedDays = editDays,
+                        onDaysChanged = { editDays = it }
+                    )
+                }
+
+                // Duração em meses
+                OutlinedTextField(
+                    value = editGoalMonthsText,
+                    onValueChange = { editGoalMonthsText = it },
+                    label = { Text("Duracao da meta (meses, ex: 3)") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.outline
+                    )
+                )
+            }
 
             // Tag selector
             Column {
